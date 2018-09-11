@@ -20,8 +20,10 @@
 #cmakedefine01 ENABLE_ALSA
 #cmakedefine01 ENABLE_MPD
 #cmakedefine01 ENABLE_NETWORK
+#cmakedefine01 WITH_LIBNL
 #cmakedefine01 ENABLE_I3
 #cmakedefine01 ENABLE_CURL
+#cmakedefine01 ENABLE_PULSEAUDIO
 
 #cmakedefine01 WITH_XRANDR
 #cmakedefine01 WITH_XRENDER
@@ -30,6 +32,7 @@
 #cmakedefine01 WITH_XCOMPOSITE
 #cmakedefine01 WITH_XKB
 #cmakedefine01 WITH_XRM
+#cmakedefine01 WITH_XCURSOR
 
 #if WITH_XRANDR
 #cmakedefine01 WITH_XRANDR_MONITORS
@@ -45,8 +48,9 @@
 
 #cmakedefine XPP_EXTENSION_LIST @XPP_EXTENSION_LIST@
 
-#if DEBUG
 #cmakedefine DEBUG_LOGGER
+
+#if DEBUG
 #cmakedefine DEBUG_LOGGER_VERBOSE
 #cmakedefine DEBUG_HINTS
 #cmakedefine DEBUG_WHITESPACE
@@ -98,23 +102,26 @@ const auto version_details = [](const std::vector<std::string>& args) {
 // clang-format off
 const auto print_build_info = [](bool extended = false) {
   printf("%s %s\n\n", APP_NAME, APP_VERSION);
-  printf("Features: %calsa %ccurl %ci3 %cmpd %cnetwork\n",
-    (ENABLE_ALSA    ? '+' : '-'),
-    (ENABLE_CURL    ? '+' : '-'),
-    (ENABLE_I3      ? '+' : '-'),
-    (ENABLE_MPD     ? '+' : '-'),
-    (ENABLE_NETWORK ? '+' : '-'));
+  printf("Features: %calsa %ccurl %ci3 %cmpd %cnetwork %cpulseaudio %cxkeyboard\n",
+    (ENABLE_ALSA       ? '+' : '-'),
+    (ENABLE_CURL       ? '+' : '-'),
+    (ENABLE_I3         ? '+' : '-'),
+    (ENABLE_MPD        ? '+' : '-'),
+    (ENABLE_NETWORK    ? '+' : '-'),
+    (ENABLE_PULSEAUDIO ? '+' : '-'),
+    (ENABLE_XKEYBOARD  ? '+' : '-'));
   if (extended) {
     printf("\n");
-    printf("X extensions: %crandr (%cmonitors) %crender %cdamage %csync %ccomposite %cxkb %cxrm\n",
+    printf("X extensions: %crandr (%cmonitors) %crender %cdamage %csync %ccomposite %cxkb %cxrm %cxcursor\n",
       (WITH_XRANDR            ? '+' : '-'),
-      (WITH_XRANDR_MONITORS ? '+' : '-'),
+      (WITH_XRANDR_MONITORS   ? '+' : '-'),
       (WITH_XRENDER           ? '+' : '-'),
       (WITH_XDAMAGE           ? '+' : '-'),
       (WITH_XSYNC             ? '+' : '-'),
       (WITH_XCOMPOSITE        ? '+' : '-'),
       (WITH_XKB               ? '+' : '-'),
-      (WITH_XRM      ? '+' : '-'));
+      (WITH_XRM               ? '+' : '-'),
+      (WITH_XCURSOR           ? '+' : '-'));
     printf("\n");
     printf("Build type: @CMAKE_BUILD_TYPE@\n");
     printf("Compiler: @CMAKE_CXX_COMPILER@\n");

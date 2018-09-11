@@ -21,6 +21,10 @@
 #include "x11/icccm.hpp"
 #include "x11/tray_manager.hpp"
 
+#if WITH_XCURSOR
+#include "x11/cursor.hpp"
+#endif
+
 #if ENABLE_I3
 #include "utils/i3.hpp"
 #endif
@@ -125,6 +129,19 @@ bar::bar(connection& conn, signal_emitter& emitter, const config& config, const 
 
   m_opts.dimvalue = m_conf.get(bs, "dim-value", 1.0);
   m_opts.dimvalue = math_util::cap(m_opts.dimvalue, 0.0, 1.0);
+
+  m_opts.cursor_click = m_conf.get(bs, "cursor-click", ""s);
+  m_opts.cursor_scroll = m_conf.get(bs, "cursor-scroll", ""s);
+#if WITH_XCURSOR
+  if (!m_opts.cursor_click.empty() && !cursor_util::valid(m_opts.cursor_click)) {
+    m_log.warn("Ignoring unsupported cursor-click option '%s'", m_opts.cursor_click);
+    m_opts.cursor_click.clear();
+  }
+  if (!m_opts.cursor_scroll.empty() && !cursor_util::valid(m_opts.cursor_scroll)) {
+    m_log.warn("Ignoring unsupported cursor-scroll option '%s'", m_opts.cursor_scroll);
+    m_opts.cursor_scroll.clear();
+  }
+#endif
 
   // Build WM_NAME
   m_opts.wmname = m_conf.get(bs, "wm-name", "polybar-" + bs.substr(4) + "_" + m_opts.monitor->name);
@@ -231,18 +248,10 @@ bar::bar(connection& conn, signal_emitter& emitter, const config& config, const 
   auto offsetx = m_conf.get(m_conf.section(), "offset-x", ""s);
   auto offsety = m_conf.get(m_conf.section(), "offset-y", ""s);
 
-  if ((m_opts.size.w = atoi(w.c_str())) && w.find('%') != string::npos) {
-    m_opts.size.w = math_util::percentage_to_value<int>(m_opts.size.w, m_opts.monitor->w);
-  }
-  if ((m_opts.size.h = atoi(h.c_str())) && h.find('%') != string::npos) {
-    m_opts.size.h = math_util::percentage_to_value<int>(m_opts.size.h, m_opts.monitor->h);
-  }
-  if ((m_opts.offset.x = atoi(offsetx.c_str())) != 0 && offsetx.find('%') != string::npos) {
-    m_opts.offset.x = math_util::percentage_to_value<int>(m_opts.offset.x, m_opts.monitor->w);
-  }
-  if ((m_opts.offset.y = atoi(offsety.c_str())) != 0 && offsety.find('%') != string::npos) {
-    m_opts.offset.y = math_util::percentage_to_value<int>(m_opts.offset.y, m_opts.monitor->h);
-  }
+  m_opts.size.w = geom_format_to_pixels(w, m_opts.monitor->w);
+  m_opts.size.h = geom_format_to_pixels(h, m_opts.monitor->h);;
+  m_opts.offset.x = geom_format_to_pixels(offsetx, m_opts.monitor->w);
+  m_opts.offset.y = geom_format_to_pixels(offsety, m_opts.monitor->h);
 
   // Apply offsets
   m_opts.pos.x = m_opts.offset.x + m_opts.monitor->x;
@@ -554,7 +563,6 @@ void bar::handle(const evt::enter_notify&) {
   }
 #endif
 #endif
-
   if (m_opts.dimmed) {
     m_taskqueue->defer_unique("window-dim", 25ms, [&](size_t) {
       m_opts.dimmed = false;
@@ -580,13 +588,81 @@ void bar::handle(const evt::leave_notify&) {
   }
 #endif
 #endif
-
   if (!m_opts.dimmed) {
     m_taskqueue->defer_unique("window-dim", 3s, [&](size_t) {
       m_opts.dimmed = true;
       m_sig.emit(dim_window{double(m_opts.dimvalue)});
     });
   }
+}
+
+/**
+ * Event handler for XCB_MOTION_NOTIFY events
+ *
+ * Used to change the cursor depending on the module
+ */
+void bar::handle(const evt::motion_notify& evt) {
+  if (!m_mutex.try_lock()) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> guard(m_mutex, std::adopt_lock);
+
+  m_log.trace("bar: Detected motion: %i at pos(%i, %i)", evt->detail, evt->event_x, evt->event_y);
+#if WITH_XCURSOR
+  m_motion_pos = evt->event_x;
+  // scroll cursor is less important than click cursor, so we shouldn't return until we are sure there is no click action
+  bool found_scroll = false;
+  const auto find_click_area = [&](const action& action) {
+    if (!m_opts.cursor_click.empty() && !(action.button == mousebtn::SCROLL_UP || action.button == mousebtn::SCROLL_DOWN || action.button == mousebtn::NONE)) {
+      if (!string_util::compare(m_opts.cursor, m_opts.cursor_click)) {
+        m_opts.cursor = m_opts.cursor_click;
+        m_sig.emit(cursor_change{string{m_opts.cursor}});
+      }
+      return true;
+    } else if (!m_opts.cursor_scroll.empty() && (action.button == mousebtn::SCROLL_UP || action.button == mousebtn::SCROLL_DOWN)) {
+      if (!found_scroll) {
+          found_scroll = true;
+      }
+    }
+    return false;
+  };
+
+  for (auto&& action : m_renderer->actions()) {
+    if (action.test(m_motion_pos)) {
+      m_log.trace("Found matching input area");
+      if(find_click_area(action))
+        return;
+    }
+  }
+  if(found_scroll) {
+    if (!string_util::compare(m_opts.cursor, m_opts.cursor_scroll)) {
+      m_opts.cursor = m_opts.cursor_scroll;
+      m_sig.emit(cursor_change{string{m_opts.cursor}});
+    }
+    return;
+  }
+  for (auto&& action : m_opts.actions) {
+    if (!action.command.empty()) {
+      m_log.trace("Found matching fallback handler");
+      if(find_click_area(action))
+        return;
+    }
+  }
+  if(found_scroll) {
+    if (!string_util::compare(m_opts.cursor, m_opts.cursor_scroll)) {
+      m_opts.cursor = m_opts.cursor_scroll;
+      m_sig.emit(cursor_change{string{m_opts.cursor}});
+    }
+    return;
+  }
+  if (!string_util::compare(m_opts.cursor, "default")) {
+    m_log.trace("No matching cursor area found");
+    m_opts.cursor = "default";
+    m_sig.emit(cursor_change{string{m_opts.cursor}});
+    return;
+  }
+#endif
 }
 
 /**
@@ -611,13 +687,20 @@ void bar::handle(const evt::button_press& evt) {
   m_buttonpress_pos = evt->event_x;
 
   const auto deferred_fn = [&](size_t) {
-    for (auto&& action : m_renderer->actions()) {
-      if (action.button == m_buttonpress_btn && !action.active && action.test(m_buttonpress_pos)) {
+    /*
+     * Iterate over all defined actions in reverse order until matching action is found
+     * To properly handle nested actions we iterate in reverse because nested actions are added later than their
+     * surrounding action block
+     */
+    auto actions = m_renderer->actions();
+    for (auto action = actions.rbegin(); action != actions.rend(); action++) {
+      if (action->button == m_buttonpress_btn && !action->active && action->test(m_buttonpress_pos)) {
         m_log.trace("Found matching input area");
-        m_sig.emit(button_press{string{action.command}});
+        m_sig.emit(button_press{string{action->command}});
         return;
       }
     }
+
     for (auto&& action : m_opts.actions) {
       if (action.button == m_buttonpress_btn && !action.command.empty()) {
         m_log.trace("Found matching fallback handler");
@@ -625,7 +708,7 @@ void bar::handle(const evt::button_press& evt) {
         return;
       }
     }
-    m_log.warn("No matching input area found (btn=%i)", static_cast<int>(m_buttonpress_btn));
+    m_log.info("No matching input area found (btn=%i)", static_cast<int>(m_buttonpress_btn));
   };
 
   const auto check_double = [&](string&& id, mousebtn&& btn) {
@@ -702,6 +785,9 @@ bool bar::on(const signals::eventqueue::start&) {
   // if we should dim the window
   if (m_opts.dimvalue != 1.0) {
     m_connection.ensure_event_mask(m_opts.window, XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW);
+  }
+  if (!m_opts.cursor_click.empty() || !m_opts.cursor_scroll.empty() ) {
+    m_connection.ensure_event_mask(m_opts.window, XCB_EVENT_MASK_POINTER_MOTION);
   }
 
   m_log.info("Bar window: %s", m_connection.id(m_opts.window));
@@ -840,5 +926,15 @@ bool bar::on(const signals::ui::dim_window& sig) {
   ewmh_util::set_wm_window_opacity(m_opts.window, sig.cast() * 0xFFFFFFFF);
   return false;
 }
+
+#if WITH_XCURSOR
+bool bar::on(const signals::ui::cursor_change& sig) {
+  if(!cursor_util::set_cursor(m_connection, m_connection.screen(), m_opts.window, sig.cast())) {
+    m_log.warn("Failed to create cursor context");
+  }
+  m_connection.flush();
+  return false;
+}
+#endif
 
 POLYBAR_NS_END

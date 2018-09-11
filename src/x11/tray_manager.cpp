@@ -144,8 +144,8 @@ void tray_manager::setup(const bar_settings& bar_opts) {
   auto offset_x_def = conf.get(bs, "tray-offset-x", ""s);
   auto offset_y_def = conf.get(bs, "tray-offset-y", ""s);
 
-  auto offset_x = atoi(offset_x_def.c_str());
-  auto offset_y = atoi(offset_y_def.c_str());
+  auto offset_x = strtol(offset_x_def.c_str(), nullptr, 10);
+  auto offset_y = strtol(offset_y_def.c_str(), nullptr, 10);
 
   if (offset_x != 0 && offset_x_def.find('%') != string::npos) {
     if (m_opts.detached) {
@@ -613,7 +613,7 @@ void tray_manager::restack_window() {
     m_connection.configure_window_checked(m_tray, mask, values);
   } catch (const exception& err) {
     auto id = m_connection.id(m_opts.sibling);
-    m_log.trace("tray: Failed to put tray above %s in the stack (%s)", id, err.what());
+    m_log.err("tray: Failed to put tray above %s in the stack (%s)", id, err.what());
   }
 }
 
@@ -754,7 +754,7 @@ void tray_manager::process_docking_request(xcb_window_t win) {
     m_log.err(err.what());
   } catch (const xpp::x::error::window& err) {
     m_log.err("Failed to query _XEMBED_INFO, removing client... (%s)", err.what());
-    remove_client(win, false);
+    remove_client(win, true);
     return;
   }
 
@@ -1044,7 +1044,7 @@ void tray_manager::handle(const evt::property_notify& evt) {
     return;
   } catch (const xpp::x::error::window& err) {
     m_log.err("Failed to query _XEMBED_INFO, removing client... (%s)", err.what());
-    remove_client(win, false);
+    remove_client(win, true);
     return;
   }
 

@@ -1,7 +1,9 @@
-# Polybar
+![Polybar](banner.png)
 
+[![Release](https://img.shields.io/github/release/jaagr/polybar.svg)](https://github.com/jaagr/polybar/releases)
 [![Build Status](https://travis-ci.org/jaagr/polybar.svg?branch=master)](https://travis-ci.org/jaagr/polybar)
-[![MIT License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000?style=plastic)](https://github.com/jaagr/polybar/blob/master/LICENSE)
+[![Coverage Status](https://codecov.io/gh/jaagr/polybar/branch/master/graph/badge.svg)](https://codecov.io/gh/jaagr/polybar/branch/master)
+[![MIT License](https://img.shields.io/github/license/jaagr/polybar.svg)](https://github.com/jaagr/polybar/blob/master/LICENSE)
 
 A fast and easy-to-use tool for creating status bars.
 
@@ -14,7 +16,12 @@ Here are a few screenshots showing you what it can look like:
 [![sample screenshot](http://i.imgur.com/A6spiZZt.png)](http://i.imgur.com/A6spiZZ.png)
 [![sample screenshot](http://i.imgur.com/TY5a5r9t.png)](http://i.imgur.com/TY5a5r9.png)
 
-Please report any issues or bugs you may find by [creating an issue ticket](https://github.com/jaagr/polybar/issues/new) here on GitHub.
+You can find polybar configs for these example images (and other configs) [here](https://github.com/jaagr/dots/tree/master/.local/etc/themer/themes). 
+
+
+If you need help, check out the [Support](SUPPORT.md) page.
+
+Please report any issues or bugs you may find by [creating an issue ticket](https://github.com/jaagr/polybar/issues/new/choose) here on GitHub.
 Make sure you include steps on how to reproduce it. There's also an irc channel available at freenode, cleverly named `#polybar`.
 
 
@@ -26,6 +33,7 @@ Make sure you include steps on how to reproduce it. There's also an irc channel 
   * [Building from source](#building-from-source)
   * [Configuration](#configuration)
   * [Running](#running)
+* [Contributors](#contributors)
 * [License](#license)
 
 
@@ -58,41 +66,66 @@ Some of the services included so far:
 
 ## Getting started
 
+<a href="https://repology.org/metapackage/polybar">
+    <img src="https://repology.org/badge/vertical-allrepos/polybar.svg" alt="Packaging status" align="right">
+</a>
+
+Polybar was already packaged for the distros listed below.
+If you can't find your distro here, you will have to [build from source](#building-from-source).
+
+If you create a package for any other distribution, please consider contributing the template.
+
 If you are using **Arch Linux**, you can install the AUR package [polybar-git](https://aur.archlinux.org/packages/polybar-git/) to get the latest version, or
-[polybar](https://aur.archlinux.org/packages/polybar/) for the latest stable release. If you create a package for any other distribution, please consider contributing the template.
+[polybar](https://aur.archlinux.org/packages/polybar/) for the latest stable release.
 
-If you are using **Void Linux**, you can install [polybar](https://github.com/voidlinux/void-packages/blob/master/srcpkgs/polybar/template) using `xbps-install -S polybar`.
+If you are using **Void Linux**, you can install [polybar](https://github.com/void-linux/void-packages/blob/master/srcpkgs/polybar/template) using `xbps-install -S polybar`.
 
-If you are using **NixOS**, polybar is available in the unstable channel and can be installed with the command `nix-env -iA nixos.polybar`.
+If you are using **NixOS**, polybar is available in both the stable and unstable channels and can be installed with the command `nix-env -iA nixos.polybar`.
 
+If you are using **Ubuntu**, polybar is available from the [GetDeb](http://www.getdeb.net/app/Polybar) repository.
+
+If you are using **Slackware**, polybar is available from the [SlackBuilds](https://slackbuilds.org/repository/14.2/desktop/polybar/) repository.
+
+If you are using **Source Mage GNU/Linux**, polybar spell is available in test grimoire and can be installed via `cast polybar`.
+
+If you are using **openSUSE**, polybar is available from [OBS](https://build.opensuse.org/package/show/home:sysek/polybar) repository. Package is available for openSUSE Leap 15 and Tumbleweed.
+
+If you are using **FreeBSD**, [polybar](https://svnweb.freebsd.org/ports/head/x11/polybar/) can be installed using `pkg install polybar`. Make sure you are using the `latest` package branch.
+
+If you are using **Gentoo**, both release and git-master versions are available in the [main](https://packages.gentoo.org/packages/x11-misc/polybar) repository.
 
 ### Dependencies
 
-A compiler with C++14 support ([clang-3.4+](http://llvm.org/releases/download.html), [gcc-5.1+](https://gcc.gnu.org/releases.html)).
+A compiler with C++14 support ([clang-3.4+](http://llvm.org/releases/download.html), [gcc-5.1+](https://gcc.gnu.org/releases.html)), [cmake 3.1+](https://cmake.org/download/), [git](https://git-scm.com/downloads)
 - cairo
 - libxcb
 - python2
 - xcb-proto
 - xcb-util-image
 - xcb-util-wm
-- xcb-util-xrm
 
-Optional dependencies for extended module support:
-- alsa-lib *required by `internal/volume`*
+**Optional dependencies:**
+- xcb-util-cursor *required for the `cursor-click` and `cursor-scroll` settings*
+- xcb-util-xrm *required for accessing X resources with `${xrdb:...}`*
+
+**Optional dependencies for extended module support:**
+- alsa-lib *required by `internal/alsa`*
+- libpulse *required by `internal/pulseaudio`*
+- i3-wm *required by `internal/i3`*
 - jsoncpp *required by `internal/i3`*
 - libmpdclient *required by `internal/mpd`*
 - libcurl *required by `internal/github`*
-- wireless_tools *required by `internal/network`*
+- libnl-genl or wireless_tools *required by `internal/network`*
 
 Find a more complete list on the [dedicated wiki page](https://github.com/jaagr/polybar/wiki/Compiling).
 
 
 ### Building from source
 
-Please [report any problems](https://github.com/jaagr/polybar/issues/new) you run into when building the project.
+Please [report any problems](https://github.com/jaagr/polybar/issues/new/choose) you run into when building the project.
 
   ~~~ sh
-  $ git clone --branch 3.0.5 --recursive https://github.com/jaagr/polybar
+  $ git clone --branch 3.2 --recursive https://github.com/jaagr/polybar
   $ mkdir polybar/build
   $ cd polybar/build
   $ cmake ..
@@ -105,15 +138,17 @@ There's also a helper script available in the root folder:
   $ ./build.sh
   ~~~
 
+For more info, have a look at the [Compiling wiki page](https://github.com/jaagr/polybar/wiki/Compiling).
 
 ### Configuration
 
 Details on how to setup and configure the bar and each module have been moved to [the wiki](https://github.com/jaagr/polybar/wiki/Configuration).
 
 #### Install the example configuration
-  ~~~ sh
-  $ make userconfig
-  ~~~
+Run the following inside the build directory:
+~~~ sh
+$ make userconfig
+~~~
 
 #### Launch the example bar
   ~~~ sh
@@ -125,6 +160,21 @@ Details on how to setup and configure the bar and each module have been moved to
 
 [See the wiki for details on how to run polybar](https://github.com/jaagr/polybar/wiki).
 
+## Contributors
+
+### Owner
+* Michael Carlberg [**@jaagr**](http://github.com/jaagr/)
+
+### Maintainers
+* [**@NBonaparte**](https://github.com/NBonaparte)
+* Chase Geigle [**@skystrife**](https://github.com/skystrife)
+* Patrick Ziegler [**@patrick96**](https://github.com/patrick96)
+
+### Logo Design by
+* [**@Tobaloidee**](https://github.com/Tobaloidee)
+
+
+### [All Contributors](https://github.com/jaagr/polybar/graphs/contributors)
 
 ## License
 

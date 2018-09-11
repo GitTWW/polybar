@@ -13,10 +13,17 @@ endfunction()
 # colored_option {{{
 
 function(colored_option text flag)
+  # Append version of option, if ${flag}_VERSION is set
+  set(version ${${flag}_VERSION})
+
+  if(NOT "${version}" STREQUAL "")
+    set(text "${text} (${version})")
+  endif()
+
   if(${flag})
-    message_colored(STATUS "${text}" "32;1")
+    message_colored(STATUS "[X]${text}" "32;1")
   else()
-    message_colored(STATUS "${text}" "37;2")
+    message_colored(STATUS "[ ]${text}" "37;2")
   endif()
 endfunction()
 
@@ -202,9 +209,9 @@ function(queryfont output_variable fontname)
   endforeach()
 
   if(matches)
-    list(GET matches 0 output_variable)
-    set(output_variable "${output_variable}" PARENT_SCOPE)
-    message(STATUS "Found font: ${output_variable}")
+    list(GET matches 0 fst_match)
+    set(${output_variable} "${fst_match}" PARENT_SCOPE)
+    message(STATUS "Found font: ${fst_match}")
   else()
     message_colored(STATUS "Font not found: ${fontname}" "33;1")
   endif()
@@ -233,6 +240,9 @@ function(querylib flag type pkg out_library out_include_dirs)
     elseif(${type} STREQUAL "pkg-config")
       find_package(PkgConfig REQUIRED)
       pkg_check_modules(PKG_${flag} REQUIRED ${pkg})
+
+      # Set packet version so that it can be used in the summary
+      set(${flag}_VERSION ${PKG_${flag}_VERSION} PARENT_SCOPE)
       list(APPEND ${out_library} ${PKG_${flag}_LIBRARIES})
       list(APPEND ${out_include_dirs} ${PKG_${flag}_INCLUDE_DIRS})
     else()

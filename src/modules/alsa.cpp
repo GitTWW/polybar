@@ -1,4 +1,4 @@
-#include "modules/volume.hpp"
+#include "modules/alsa.hpp"
 #include "adapters/alsa/control.hpp"
 #include "adapters/alsa/generic.hpp"
 #include "adapters/alsa/mixer.hpp"
@@ -16,11 +16,12 @@ POLYBAR_NS
 using namespace alsa;
 
 namespace modules {
-  template class module<volume_module>;
+  template class module<alsa_module>;
 
-  volume_module::volume_module(const bar_settings& bar, string name_) : event_module<volume_module>(bar, move(name_)) {
+  alsa_module::alsa_module(const bar_settings& bar, string name_) : event_module<alsa_module>(bar, move(name_)) {
     // Load configuration values
     m_mapped = m_conf.get(name(), "mapped", m_mapped);
+    m_interval = m_conf.get(name(), "interval", m_interval);
 
     auto master_mixer_name = m_conf.get(name(), "master-mixer", "Master"s);
     auto speaker_mixer_name = m_conf.get(name(), "speaker-mixer", ""s);
@@ -86,13 +87,13 @@ namespace modules {
     }
   }
 
-  void volume_module::teardown() {
+  void alsa_module::teardown() {
     m_mixer.clear();
     m_ctrl.clear();
     snd_config_update_free_global();
   }
 
-  bool volume_module::has_event() {
+  bool alsa_module::has_event() {
     // Poll for mixer and control events
     try {
       if (m_mixer[mixer::MASTER] && m_mixer[mixer::MASTER]->wait(25)) {
@@ -114,7 +115,7 @@ namespace modules {
     return false;
   }
 
-  bool volume_module::update() {
+  bool alsa_module::update() {
     // Consume pending events
     if (m_mixer[mixer::MASTER]) {
       m_mixer[mixer::MASTER]->process_events();
@@ -179,11 +180,11 @@ namespace modules {
     return true;
   }
 
-  string volume_module::get_format() const {
+  string alsa_module::get_format() const {
     return m_muted ? FORMAT_MUTED : FORMAT_VOLUME;
   }
 
-  string volume_module::get_output() {
+  string alsa_module::get_output() {
     // Get the module output early so that
     // the format prefix/suffix also gets wrapper
     // with the cmd handlers
@@ -200,7 +201,7 @@ namespace modules {
     return m_builder->flush();
   }
 
-  bool volume_module::build(builder* builder, const string& tag) const {
+  bool alsa_module::build(builder* builder, const string& tag) const {
     if (tag == TAG_BAR_VOLUME) {
       builder->node(m_bar_volume->output(m_volume));
     } else if (tag == TAG_RAMP_VOLUME && (!m_headphones || !*m_ramp_headphones)) {
@@ -217,7 +218,7 @@ namespace modules {
     return true;
   }
 
-  bool volume_module::input(string&& cmd) {
+  bool alsa_module::input(string&& cmd) {
     if (!m_handle_events) {
       return false;
     } else if (cmd.compare(0, 3, EVENT_PREFIX) != 0) {
@@ -240,7 +241,7 @@ namespace modules {
       }
       if (m_mixer[mixer::SPEAKER] && !m_mixer[mixer::SPEAKER]->get_name().empty() && !headphones) {
         mixers.emplace_back(new mixer_t::element_type(
-            string{m_mixer[mixer::SPEAKER]->get_name()}, string{m_mixer[mixer::HEADPHONE]->get_sound_card()}));
+            string{m_mixer[mixer::SPEAKER]->get_name()}, string{m_mixer[mixer::SPEAKER]->get_sound_card()}));
       }
 
       if (cmd.compare(0, strlen(EVENT_TOGGLE_MUTE), EVENT_TOGGLE_MUTE) == 0) {
@@ -249,13 +250,13 @@ namespace modules {
         }
       } else if (cmd.compare(0, strlen(EVENT_VOLUME_UP), EVENT_VOLUME_UP) == 0) {
         for (auto&& mixer : mixers) {
-          m_mapped ? mixer->set_normalized_volume(math_util::cap<float>(mixer->get_normalized_volume() + 5, 0, 100))
-                   : mixer->set_volume(math_util::cap<float>(mixer->get_volume() + 5, 0, 100));
+          m_mapped ? mixer->set_normalized_volume(math_util::cap<float>(mixer->get_normalized_volume() + m_interval, 0, 100))
+                   : mixer->set_volume(math_util::cap<float>(mixer->get_volume() + m_interval, 0, 100));
         }
       } else if (cmd.compare(0, strlen(EVENT_VOLUME_DOWN), EVENT_VOLUME_DOWN) == 0) {
         for (auto&& mixer : mixers) {
-          m_mapped ? mixer->set_normalized_volume(math_util::cap<float>(mixer->get_normalized_volume() - 5, 0, 100))
-                   : mixer->set_volume(math_util::cap<float>(mixer->get_volume() - 5, 0, 100));
+          m_mapped ? mixer->set_normalized_volume(math_util::cap<float>(mixer->get_normalized_volume() - m_interval, 0, 100))
+                   : mixer->set_volume(math_util::cap<float>(mixer->get_volume() - m_interval, 0, 100));
         }
       } else {
         return false;
